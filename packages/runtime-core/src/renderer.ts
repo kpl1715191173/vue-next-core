@@ -2393,7 +2393,7 @@ function baseCreateRenderer(
   return {
     render,
     hydrate,
-    createApp: createAppAPI(render, hydrate),
+    createApp: createAppAPI(render, hydrate), // 调用createAppAPI实现柯里化
   }
 }
 
