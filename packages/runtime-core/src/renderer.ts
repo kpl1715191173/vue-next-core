@@ -358,9 +358,9 @@ function baseCreateRenderer(
   // Note: functions inside this closure should use `const xxx = () => {}`
   // style in order to prevent being inlined by minifiers.
   const patch: PatchFn = (
-    n1,
-    n2,
-    container,
+    n1, // 旧VNode，当n1为null表示进行挂载操作 (即n1决定是挂载还是更新)
+    n2 , // 新VNode，根据n2的type进行不同的处理
+    container, // 渲染后挂载的地方
     anchor = null,
     parentComponent = null,
     parentSuspense = null,
@@ -373,6 +373,7 @@ function baseCreateRenderer(
     }
 
     // patching & not same type, unmount old tree
+    // 1️⃣ 如果新的节点和旧的节点类型不同，那么直接销毁整个子节点树
     if (n1 && !isSameVNodeType(n1, n2)) {
       anchor = getNextHostNode(n1)
       unmount(n1, parentComponent, parentSuspense, true)
@@ -384,15 +385,21 @@ function baseCreateRenderer(
       n2.dynamicChildren = null
     }
 
+    // 2️⃣ 获取节点的 type / ref / shapeFlag
+    // type 用于判断节点类型
+    // shapeFlag 用于判断具体的节点的
     const { type, ref, shapeFlag } = n2
     switch (type) {
       case Text:
+        // 文本节点
         processText(n1, n2, container, anchor)
         break
       case Comment:
+        // 注释节点
         processCommentNode(n1, n2, container, anchor)
         break
       case Static:
+        // 静态节点
         if (n1 == null) {
           mountStaticNode(n2, container, anchor, namespace)
         } else if (__DEV__) {
@@ -400,6 +407,7 @@ function baseCreateRenderer(
         }
         break
       case Fragment:
+        // Fragment组件节点
         processFragment(
           n1,
           n2,
@@ -413,7 +421,9 @@ function baseCreateRenderer(
         )
         break
       default:
+        // 处理普通的DOM元素，E.g. div / button / span
         if (shapeFlag & ShapeFlags.ELEMENT) {
+          // VNode -> <div></div> 元素类型
           processElement(
             n1,
             n2,
@@ -426,6 +436,7 @@ function baseCreateRenderer(
             optimized,
           )
         } else if (shapeFlag & ShapeFlags.COMPONENT) {
+          // VNode -> <App/> 组件类型
           processComponent(
             n1,
             n2,
@@ -1160,6 +1171,7 @@ function baseCreateRenderer(
     optimized: boolean,
   ) => {
     n2.slotScopeIds = slotScopeIds
+    // S1: n1等于null，表示挂载节点
     if (n1 == null) {
       if (n2.shapeFlag & ShapeFlags.COMPONENT_KEPT_ALIVE) {
         ;(parentComponent!.ctx as KeepAliveContext).activate(
@@ -1170,6 +1182,7 @@ function baseCreateRenderer(
           optimized,
         )
       } else {
+        // 挂载节点
         mountComponent(
           n2,
           container,
@@ -1180,7 +1193,9 @@ function baseCreateRenderer(
           optimized,
         )
       }
-    } else {
+    }
+    // S2: 更新组件
+    else {
       updateComponent(n1, n2, optimized)
     }
   }
@@ -1198,6 +1213,9 @@ function baseCreateRenderer(
     // mounting
     const compatMountInstance =
       __COMPAT__ && initialVNode.isCompatRoot && initialVNode.component
+
+    // 1. 调用 createComponentInstance 创建组件实例
+    // instance用于保存组件各种状态。E.g. Mustache插值语法中的变量等等
     const instance: ComponentInternalInstance =
       compatMountInstance ||
       (initialVNode.component = createComponentInstance(
@@ -2349,11 +2367,13 @@ function baseCreateRenderer(
   }
 
   const render: RootRenderFunction = (vnode, container, namespace) => {
+    // 如果VNode为null，则永久销毁
     if (vnode == null) {
       if (container._vnode) {
         unmount(container._vnode, null, null, true)
       }
     } else {
+      // 根组件挂载到DOM (创建或者更新均使用patch函数)
       patch(
         container._vnode || null,
         vnode,
@@ -2366,6 +2386,8 @@ function baseCreateRenderer(
     }
     flushPreFlushCbs()
     flushPostFlushCbs()
+
+    // 放在container上面缓存VNode
     container._vnode = vnode
   }
 

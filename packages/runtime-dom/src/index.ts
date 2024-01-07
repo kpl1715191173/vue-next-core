@@ -81,8 +81,16 @@ export const createApp = ((...args) => {
     injectCompilerOptionsCheck(app)
   }
 
+  // 2. 从app取出mount方法，后续进行重写
   const { mount } = app
+
+  // 3. 重写mount方法
+  // 这里重写 packages/runtime-core/src/apiCreateApp.ts 里面app定义的mount方法
+  // 重写的目的在于跨平台的兼容
+  // 原先app.mount里面只包含和平台无关的代码
+  // 这里重写的代码都是一些和web关系比较大的代码，其他平台如原生开发、IOS开发等可进行类似重写
   app.mount = (containerOrSelector: Element | ShadowRoot | string): any => {
+    // normalizeContainer 方法就是在web端获取我们的元素，E.g. div#app
     const container = normalizeContainer(containerOrSelector)
     if (!container) return
 

@@ -211,6 +211,7 @@ export function createAppAPI<HostElement>(
 
     let isMounted = false
 
+    // 定义一个app对象
     const app: App = (context.app = {
       _uid: uid++,
       _component: rootComponent as ConcreteComponent,
@@ -310,10 +311,13 @@ export function createAppAPI<HostElement>(
                 ` you need to unmount the previous app by calling \`app.unmount()\` first.`,
             )
           }
+
+          // 1. 创建跟组件的 VNode
+          // 使用 createVNode() 来创建 VNode对象，h()方法函数本质上也是调用createVNode()方法
           const vnode = createVNode(rootComponent, rootProps)
           // store app context on the root VNode.
           // this will be set on the root instance on initial mount.
-          vnode.appContext = context
+          vnode.a ppContext = context
 
           if (namespace === true) {
             namespace = 'svg'
@@ -337,6 +341,7 @@ export function createAppAPI<HostElement>(
           if (isHydrate && hydrate) {
             hydrate(vnode as VNode<Node, Element>, rootContainer as any)
           } else {
+            // 渲染VNode
             render(vnode, rootContainer, namespace)
           }
           isMounted = true
@@ -400,6 +405,7 @@ export function createAppAPI<HostElement>(
       installAppCompatProperties(app, context, render)
     }
 
+    // 返回app对象
     return app
   }
 }
