@@ -359,7 +359,7 @@ function baseCreateRenderer(
   // style in order to prevent being inlined by minifiers.
   const patch: PatchFn = (
     n1, // 旧VNode，当n1为null表示进行挂载操作 (即n1决定是挂载还是更新)
-    n2 , // 新VNode，根据n2的type进行不同的处理
+    n2, // 新VNode，根据n2的type进行不同的处理
     container, // 渲染后挂载的地方
     anchor = null,
     parentComponent = null,
@@ -640,8 +640,13 @@ function baseCreateRenderer(
   ) => {
     let el: RendererElement
     let vnodeHook: VNodeHook | undefined | null
+
+    // 1. 从VNode中获取各种各样的属性
     const { props, shapeFlag, transition, dirs } = vnode
 
+    // 2. 根据类型和其他属性，创建DOM元素节点
+    // hostCreateElement是跨平台函数，在web下会执行document.createElement函数
+    // 所以最终不管是vue还是react，他们还是会操作DOM，只是对我们都是不可见
     el = vnode.el = hostCreateElement(
       vnode.type as string,
       namespace,
@@ -651,9 +656,14 @@ function baseCreateRenderer(
 
     // mount children first, since some props may rely on child content
     // being already rendered, e.g. `<select value>`
+    // 3. 子节点是纯文本的情况
     if (shapeFlag & ShapeFlags.TEXT_CHILDREN) {
       hostSetElementText(el, vnode.children as string)
-    } else if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+    }
+
+    // 4. 调用mountChildren来处理子节点的children
+    // 另外注意：这里传入的container(第二个参数)其实是el，el是上面刚刚创建的element VNode对象，这样就建立了父子关系
+    else if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
       mountChildren(
         vnode.children as VNodeArrayChildren,
         el,
@@ -672,6 +682,7 @@ function baseCreateRenderer(
     // scopeId
     setScopeId(el, vnode, vnode.scopeId, slotScopeIds, parentComponent)
     // props
+    // 5. 处理props属性 <div class="" style="">
     if (props) {
       for (const key in props) {
         if (key !== 'value' && !isReservedProp(key)) {
@@ -724,6 +735,8 @@ function baseCreateRenderer(
     if (needCallTransitionHooks) {
       transition!.beforeEnter(el)
     }
+
+    // 6. 调用该方法将el挂载到container中
     hostInsert(el, container, anchor)
     if (
       (vnodeHook = props && props.onVnodeMounted) ||
@@ -787,10 +800,13 @@ function baseCreateRenderer(
     optimized,
     start = 0,
   ) => {
+    // 遍历children
     for (let i = start; i < children.length; i++) {
+      // 获取child，调用对应的patch方法
       const child = (children[i] = optimized
         ? cloneIfMounted(children[i] as VNode)
         : normalizeVNode(children[i]))
+      // 调用patch如果继续有子节点就会依次执行，本质是一个深度优先的算法
       patch(
         null,
         child,
@@ -1215,7 +1231,9 @@ function baseCreateRenderer(
       __COMPAT__ && initialVNode.isCompatRoot && initialVNode.component
 
     // 1. 调用 createComponentInstance 创建组件实例
-    // instance用于保存组件各种状态。E.g. Mustache插值语法中的变量等等
+    // instance用于保存组件各种状态
+    // E.g. Mustache插值语法中的变量、data、setup、生命周期等等
+    // 默认属性都是 null，详见 packages/runtime-core/src/component.ts
     const instance: ComponentInternalInstance =
       compatMountInstance ||
       (initialVNode.component = createComponentInstance(
@@ -1243,6 +1261,10 @@ function baseCreateRenderer(
       if (__DEV__) {
         startMeasure(instance, `init`)
       }
+
+      // 2.setup组件实例，作用是对组件的props/slots/data等进行初始化处理
+      // 并且内部有对 Vue2 的 options API 兼容处理
+      // 对组件所有的数据进行操作和复制的代码
       setupComponent(instance)
       if (__DEV__) {
         endMeasure(instance, `init`)
@@ -1261,6 +1283,7 @@ function baseCreateRenderer(
         processCommentNode(null, placeholder, container!, anchor)
       }
     } else {
+      // 调用设置和渲染有副作用的函数(副作用详见响应式使用)
       setupRenderEffect(
         instance,
         initialVNode,
@@ -1313,6 +1336,7 @@ function baseCreateRenderer(
     }
   }
 
+  // 有副作用的函数
   const setupRenderEffect: SetupRenderEffectFn = (
     instance,
     initialVNode,
@@ -1323,6 +1347,7 @@ function baseCreateRenderer(
     optimized,
   ) => {
     const componentUpdateFn = () => {
+      // 组件没有被挂载，则挂载组件
       if (!instance.isMounted) {
         let vnodeHook: VNodeHook | null | undefined
         const { el, props } = initialVNode
@@ -1355,6 +1380,9 @@ function baseCreateRenderer(
             if (__DEV__) {
               startMeasure(instance, `render`)
             }
+
+            // 子树的VNode挂载到container中
+            // 比如上面的案例中，组件是一个div，那么是一个普通的节点的方式调用patch
             instance.subTree = renderComponentRoot(instance)
             if (__DEV__) {
               endMeasure(instance, `render`)
@@ -1455,7 +1483,7 @@ function baseCreateRenderer(
             )
           }
         }
-        instance.isMounted = true
+        instance.isMounted = true // 标记为已挂载
 
         if (__DEV__ || __FEATURE_PROD_DEVTOOLS__) {
           devtoolsComponentAdded(instance)
@@ -1463,7 +1491,9 @@ function baseCreateRenderer(
 
         // #2458: deference mount-only object parameters to prevent memleaks
         initialVNode = container = anchor = null as any
-      } else {
+      }
+      // 更新组件
+      else {
         let { next, bu, u, parent, vnode } = instance
 
         if (__FEATURE_SUSPENSE__) {
@@ -1525,7 +1555,11 @@ function baseCreateRenderer(
         if (__DEV__) {
           startMeasure(instance, `render`)
         }
-        const nextTree = renderComponentRoot(instance)
+        // 调用 renderComponentRoot 渲染组件，生成子树VNode
+        // 因为template会被编译成render函数，所以renderComponentRoot就是去执行render函数
+        // 从而获取到 子树的VNode
+        // renderComponentRoot 中还有收集dynamicBlock
+        const nextTree = renderComponentRoot(instance) // Fragment类型
         if (__DEV__) {
           endMeasure(instance, `render`)
         }
@@ -1588,6 +1622,8 @@ function baseCreateRenderer(
     }
 
     // create reactive effect for rendering
+    // 创建响应式的副作用渲染函数
+    // effect的作用是当组件的数据发生变化时，effect函数包裹的内部函数componentUpdateFn会重新执行，重新渲染组件
     const effect = (instance.effect = new ReactiveEffect(
       componentUpdateFn,
       NOOP,
