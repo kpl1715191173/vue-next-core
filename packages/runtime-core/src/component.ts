@@ -535,20 +535,21 @@ export function createComponentInstance(
   const appContext =
     (parent ? parent.appContext : vnode.appContext) || emptyAppContext
 
+  // 定义一个组件实例
   const instance: ComponentInternalInstance = {
-    uid: uid++,
-    vnode,
-    type,
-    parent,
-    appContext,
-    root: null!, // to be immediately set
-    next: null,
-    subTree: null!, // will be set synchronously right after creation
-    effect: null!,
-    update: null!, // will be set synchronously right after creation
+    uid: uid++, // 组件唯一id
+    vnode, // 组件VNode
+    type, // VNode节点类型
+    parent, // 父组件实例
+    appContext, // app上下文
+    root: null!, // to be immediately set 根组件实例
+    next: null, // 新的组件VNode
+    subTree: null!, // 子节点 will be set synchronously right after creation
+    effect: null!, // 渲染效果实例
+    update: null!, // 带副作用的更新函数 will be set synchronously right after creation
     scope: new EffectScope(true /* detached */),
-    render: null,
-    proxy: null,
+    render: null, // 渲染函数
+    proxy: null, // 渲染代理
     exposed: null,
     exposeProxy: null,
     withProxy: null,
