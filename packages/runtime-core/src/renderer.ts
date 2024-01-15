@@ -1417,6 +1417,10 @@ function baseCreateRenderer(
           if (__DEV__) {
             startMeasure(instance, `render`)
           }
+          // 调用 renderComponentRoot 渲染组件，生成子树VNode
+          // 因为template会被编译成render函数，所以renderComponentRoot就是去执行render函数
+          // 从而获取到 子树的VNode
+          // renderComponentRoot 中还有收集dynamicBlock
           const subTree = (instance.subTree = renderComponentRoot(instance))
           if (__DEV__) {
             endMeasure(instance, `render`)
@@ -1424,6 +1428,13 @@ function baseCreateRenderer(
           if (__DEV__) {
             startMeasure(instance, `patch`)
           }
+
+          // 把子树的VNode挂载到container中
+          // 比如上面的案例中，组件是一个div，那么是一个普通的节点的方式调用patch函数
+          // 此处含有根节点所以执行patch具体过程如下↘
+          //   switch-default -> if (shapeFlag & ShapeFlags.ELEMENT) ->
+          //   processElement() -> mountElement()
+          //   mountElement() 最终通过 hostInsert(...) 挂载
           patch(
             null,
             subTree,
@@ -1494,6 +1505,7 @@ function baseCreateRenderer(
       }
       // 更新组件
       else {
+        // next 来自父节点更新的挂起的新VNode
         let { next, bu, u, parent, vnode } = instance
 
         if (__FEATURE_SUSPENSE__) {
@@ -1503,7 +1515,12 @@ function baseCreateRenderer(
           if (nonHydratedAsyncRoot) {
             // only sync the properties and abort the rest of operations
             if (next) {
+              // 判断组件实例是否有新的组件VNode(也就是next是否有值)
               next.el = vnode.el
+
+              // 有值, 那么会更新组件vnode的信息
+              // 该函数主要是更新组件的props/slots
+              // 后面的renderComponentRoot会依赖这些props/slots等
               updateComponentPreRender(instance, next, optimized)
             }
             // and continue the rest of operations once the deps are resolved
@@ -1528,10 +1545,14 @@ function baseCreateRenderer(
 
         // Disallow component effect recursion during pre-lifecycle hooks.
         toggleRecurse(instance, false)
+
+        // 判断组件实例是否有新的组件vnode(也就是next是否有值)
         if (next) {
           next.el = vnode.el
           updateComponentPreRender(instance, next, optimized)
-        } else {
+        }
+        // 没有值, 那么next指向之前的vnode
+        else {
           next = vnode
         }
 
@@ -1555,15 +1576,16 @@ function baseCreateRenderer(
         if (__DEV__) {
           startMeasure(instance, `render`)
         }
-        // 调用 renderComponentRoot 渲染组件，生成子树VNode
-        // 因为template会被编译成render函数，所以renderComponentRoot就是去执行render函数
-        // 从而获取到 子树的VNode
-        // renderComponentRoot 中还有收集dynamicBlock
-        const nextTree = renderComponentRoot(instance) // Fragment类型
+
+        // 渲染新的子树vnode(比如在数据发生变化时, 模板也需要重新渲染, 生成新的子树VNode)
+        const nextTree = renderComponentRoot(instance)
         if (__DEV__) {
           endMeasure(instance, `render`)
         }
-        const prevTree = instance.subTree
+
+        // 缓存旧的子树VNode
+        const prevTree = instace.subTree
+        // 更新子树VNode
         instance.subTree = nextTree
 
         if (__DEV__) {
@@ -1583,6 +1605,7 @@ function baseCreateRenderer(
         if (__DEV__) {
           endMeasure(instance, `patch`)
         }
+        // 缓存更新后的DOM节点
         next.el = nextTree.el
         if (originNext === null) {
           // self-triggered update. In case of HOC, update parent component
